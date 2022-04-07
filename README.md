@@ -17,7 +17,7 @@ jobs:
       - name: Set workflow environment 
         uses: skr-actions/set-workflow-env@master
         with:
-          changed_files_filter: '*.js$|*.jsx$'
+          changed_files_filter: '\*.js$|\*.jsx$'
 ```
 ### Parameters
 #### `changed_files_filter`
