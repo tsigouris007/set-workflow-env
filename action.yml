@@ -1,0 +1,50 @@
+name: 'Prepare environment'
+description: 'Prepares environment variables that you can use'
+
+inputs:
+  changed_files_filter:
+    description: 'A custom filter for your changed files'
+    default: ''
+  alt_diff:
+    description: 'Alternative way to calculate changed files for PR'
+    default: "no"
+
+runs:
+  using: composite
+  steps:
+    - name: Set environment variables
+      run: |
+        echo "Event: ${{ github.event_name }}"
+        echo "PR SHA: ${{github.event.pull_request.base.sha}}"
+        echo "Ref: ${{github.ref}}"
+        if [ "${{ github.event_name }}" = "pull_request" ]; then
+          COMMIT_SHA="${{ github.event.pull_request.head.sha }}"
+          echo "Commit SHA: $COMMIT_SHA"
+          echo "Getting Pull Request changes"
+          if [ "${{ inputs.alt_diff }}" = "yes" ]; then
+            DIFF="git --no-pager diff --name-only --diff-filter=ACMRT ${{github.event.pull_request.base.sha}} ${{ github.event.pull_request.head.sha }}"
+          else
+            DIFF="git --no-pager diff --name-only --diff-filter=ACMRT ${{github.event.pull_request.base.sha}} ${{github.sha}}"
+          fi
+          echo "Getting diff: $DIFF"          
+          CHANGED_FILES=$($DIFF 2>/dev/null)
+          if [ $? -eq 0 ]; then
+            CHANGED_FILES=$(echo "$CHANGED_FILES" | grep -E "${{ inputs.changed_files_filter }}" | xargs)
+            echo "Got changed files"
+          else
+            CHANGED_FILES=""
+            echo "Something went wrong while reading the changed files"
+          fi
+        else
+          COMMIT_SHA="${{ github.sha }}"
+          echo "Commit SHA: $COMMIT_SHA"
+          echo "Getting Push changes"
+          CHANGED_FILES=$(git log -m -1 --name-only --pretty="format:" ${{ github.sha }} | grep -E '${{ inputs.changed_files_filter }}' | xargs)
+          echo "Got changed files"
+        fi
+        IFS=' ' tokens=($CHANGED_FILES)
+        echo "Changed files: $CHANGED_FILES"
+        echo "CHANGED_FILES=$(echo $CHANGED_FILES)" >> $GITHUB_ENV
+        echo "PR_NO=$(echo ${{ github.event.number }})" >> $GITHUB_ENV
+        echo "COMMIT_SHA=$(echo $COMMIT_SHA)" >> $GITHUB_ENV
+      shell: bash
